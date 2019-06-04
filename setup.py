@@ -123,16 +123,16 @@ install_requires = [
     "websocket-client",
     "peewee",
     "pymysql",
-    "mongoengine",
+    # "mongoengine",
     "numpy",
     "pandas",
     "matplotlib",
     "seaborn",
-    "futu-api",
-    "tigeropen",
-    "rqdatac",
+    # "futu-api",
+    # "tigeropen",
+    # "rqdatac",
     "ta-lib",
-    "ibapi",
+    # "ibapi",
     "deap"
 ]
 if not is_psycopg2_exists():
