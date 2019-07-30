@@ -9,6 +9,7 @@ import json
 import zlib
 import hashlib
 import hmac
+import sys
 from copy import copy
 from datetime import datetime
 from threading import Lock
@@ -84,7 +85,7 @@ INTERVAL_VT2HBDM = {
 CONTRACT_TYPE_MAP = {
     "this_week": "CW",
     "next_week": "NW",
-    "this_quarter": "CQ"
+    "quarter": "CQ"
 }
 
 
@@ -104,7 +105,7 @@ class HbdmGateway(BaseGateway):
         "代理端口": "",
     }
 
-    exchagnes = [Exchange.HUOBI]
+    exchanges = [Exchange.HUOBI]
 
     def __init__(self, event_engine):
         """Constructor"""
@@ -654,7 +655,7 @@ class HbdmRestApi(RestClient):
             )
             self.gateway.on_contract(contract)
 
-            symbol_type_map[contract.symbol] = d['contract_type']
+            symbol_type_map[contract.symbol] = d["contract_type"]
 
         self.gateway.write_log("合约信息查询成功")
 
@@ -751,6 +752,19 @@ class HbdmRestApi(RestClient):
         # Record exception if not ConnectionError
         if not issubclass(exception_type, ConnectionError):
             self.on_error(exception_type, exception_value, tb, request)
+
+    def on_error(
+        self, exception_type: type, exception_value: Exception, tb, request: Request
+    ):
+        """
+        Callback to handler request exception.
+        """
+        msg = f"触发异常，状态码：{exception_type}，信息：{exception_value}"
+        self.gateway.write_log(msg)
+
+        sys.stderr.write(
+            self.exception_detail(exception_type, exception_value, tb, request)
+        )
 
     def check_error(self, data: dict, func: str = ""):
         """"""
@@ -957,6 +971,9 @@ class HbdmDataWebsocketApi(HbdmWebsocketApiBase):
     def on_connected(self):
         """"""
         self.gateway.write_log("行情Websocket API连接成功")
+
+        for ws_symbol in self.ticks.keys():
+            self.subscribe_data(ws_symbol)
         
     def subscribe(self, req: SubscribeRequest):
         """"""
@@ -979,7 +996,11 @@ class HbdmDataWebsocketApi(HbdmWebsocketApiBase):
             gateway_name=self.gateway_name,
         )
         self.ticks[ws_symbol] = tick            
-            
+
+        self.subscribe_data(ws_symbol)
+    
+    def subscribe_data(self, ws_symbol: str):
+        """"""
         # Subscribe to market depth update
         self.req_id += 1
         req = {
@@ -1014,14 +1035,19 @@ class HbdmDataWebsocketApi(HbdmWebsocketApiBase):
         ws_symbol = data["ch"].split(".")[1]
         tick = self.ticks[ws_symbol]
         tick.datetime = datetime.fromtimestamp(data["ts"] / 1000)
+
+        tick_data = data["tick"]
+        if "bids" not in tick_data or "asks" not in tick_data:
+            print(data)
+            return
         
-        bids = data["tick"]["bids"]
+        bids = tick_data["bids"]
         for n in range(5):
             price, volume = bids[n]
             tick.__setattr__("bid_price_" + str(n + 1), float(price))
             tick.__setattr__("bid_volume_" + str(n + 1), float(volume))
 
-        asks = data["tick"]["asks"]
+        asks = tick_data["asks"]
         for n in range(5):
             price, volume = asks[n]
             tick.__setattr__("ask_price_" + str(n + 1), float(price))
