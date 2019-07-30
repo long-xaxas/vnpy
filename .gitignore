@@ -30,3 +30,7 @@ dist
 _build
 _static
 _templates
+
+# Distribution / packaging
+*.egg-info/
+*.egg
