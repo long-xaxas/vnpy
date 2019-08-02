@@ -43,7 +43,6 @@ class TickData(BaseData):
     limit_down: float = 0
 
     amount: float = 0
-    open_interest: float = 0
 
     open_price: float = 0
     high_price: float = 0
